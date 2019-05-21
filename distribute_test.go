@@ -26,7 +26,10 @@ func TestSegfault(t *testing.T) {
 
 	for _, tt := range tests {
 		key, _ := hex.DecodeString(tt.key)
-		b := k.Hash(string(key))
+		b, err := k.Hash(string(key))
+		if err != nil {
+			t.Fatal(err.Error())
+		}
 		if b != tt.b {
 			t.Errorf("k.Hash(%v)=%v, want %v", tt.key, b, tt.b)
 		}
@@ -73,7 +76,10 @@ func TestConsistent(t *testing.T) {
 			newMore := make(map[string]string, len(traceIds))
 			movedWeird := 0
 			for _, v := range traceIds {
-				k := c.Hash(v)
+				k, err := c.Hash(v)
+				if err != nil {
+					t.Fatal(err.Error())
+				}
 				newResults[k]++
 				newMore[v] = k
 				if more[v] != k {
@@ -102,7 +108,10 @@ func TestConsistent(t *testing.T) {
 
 func insertAndPrint(traceIds []string, c *Continuum, results map[string]int, more map[string]string) {
 	for _, v := range traceIds {
-		k := c.Hash(v)
+		k, err := c.Hash(v)
+		if err != nil {
+			panic(err.Error())
+		}
 		results[k]++
 		more[v] = k
 	}
@@ -132,24 +141,31 @@ func TestMisc(t *testing.T) {
 	Convey("test misc", t, func() {
 		c, err := New([]Bucket{}, 4096)
 		So(err, ShouldBeNil)
-		x := c.Hash("thing")
+		x, err := c.Hash("thing")
 		So(x, ShouldEqual, "")
+		So(err, ShouldEqual, errRingZero)
 		So(c.Size(), ShouldEqual, 0)
 		Convey("test add/remove", func() {
 			err := c.Add("one", 100)
 			So(err, ShouldBeNil)
 			So(c.Size(), ShouldEqual, 1)
-			So(c.Hash("thing"), ShouldEqual, "one")
+			x, err := c.Hash("thing")
+			So(err, ShouldBeNil)
+			So(x, ShouldEqual, "one")
 			err = c.Add("two", 100)
 			So(err, ShouldBeNil)
-			So(c.Hash("thing"), ShouldEqual, "two")
+			x, err = c.Hash("thing")
+			So(err, ShouldBeNil)
+			So(x, ShouldEqual, "two")
 			err = c.Add("two", 100)
 			So(err, ShouldNotBeNil)
 			err = c.Remove("two")
 			So(err, ShouldBeNil)
-			So(c.Hash("thing"), ShouldEqual, "one")
+			x, err = c.Hash("thing")
+			So(err, ShouldBeNil)
+			So(x, ShouldEqual, "one")
 			err = c.Remove("two")
-			So(err, ShouldNotBeNil)
+			So(err, ShouldEqual, errNoLabel)
 		})
 	})
 }
@@ -199,7 +215,10 @@ func BenchmarkConsistentKetama(b *testing.B) {
 			b.ResetTimer()
 			b.ReportAllocs()
 			for _, t := range traceIds {
-				r := c.Hash(t)
+				r, err := c.Hash(t)
+				if err != nil {
+					b.Fatal(err.Error())
+				}
 				results[r]++
 			}
 			vals := make([]float64, 0, bm.hosts)
